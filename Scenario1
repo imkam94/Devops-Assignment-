@@ -1,1 +1,35 @@
+1) The build should trigger as soon as anyone in the dev team checks in code to master branch.
+2) There will be test projects which will create and maintained in the solution along the Web and API. The
+trigger should build all the 3 projects - Web, API and test.
+The build should not be successful if any test fails.
+3) The deployment of code and artifacts should be automated to Dev environment.
+4) Upon successful deployment to the Dev environment, deployment should be easily promoted to QA
+and Prod through automated process.
+5) The deployments to QA and Prod should be enabled with Approvals from approvers only.
+
+Solutions.
+
+1.Start off by creating the Azure resources
+2.Select the Web App template.
+3.Under Project Details, select the same Subscription and Resource Group
+4.For Name, enter a unique name, such as by using your name as part.  Select the ASP.NET 4.7 Runtime stack.
+5.Repeat the process above to create a second app service for the production stage.
+6.Creating a continuous release to the QA stage
+7.Go to Pipelines | Releases.
+8.There are many starting templates to choose from, or you can even begin with an empty process template. In this case, select the Azure App Service Deployment and click Apply.
+9.Rename the default stage to “QA”. This template will deploy to QA, and then to a production stage. set up this one first.
+10.Name the pipeline to Fastcarz pipeline.
+11.The first thing to define is exactly what should be deployed. Click Add in the Artifacts section to specify the artifact to deploy.
+12.There are many types of artifacts, choose any one of them
+13.Now that the artifact has been defined, it’s time to configure the deployment to QA. Click 1 job, 1 task in the QA stage.
+14.Select the Azure subscription you used earlier to create the resources and click Authorize. If you need to create a connection to an Azure account associated with a different Microsoft account, click New and follow that workflow before continuing.
+15.Follow the workflow to authorize access to your Azure account.
+16.Enter the App service name used earlier when creating the QA app service.
+17.Return to the Pipeline tab.
+18.Click the Triggers button to define what triggers will invoke this deployment.
+19.Enable the Continuous deployment trigger. Add a Build branch filter that points at the The build pipeline’s default branch. This will kick off the deployment when the build completes.
+20.Save the release pipeline.
+21.Invoking a continuous delivery release to QA
+22.go to azure portal tab to open your Azure DevOps project.
+23.
 
