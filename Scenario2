@@ -4,3 +4,397 @@
 4) Create a sample ARM template you will use to deploy a Windows VM of any size
 5) Explain how will you access the password stored in Key Vault and use it as Admin Password in the VM
 ARM template.
+
+
+Tool We will use ARM Template Azure Devops Azure Artifact.
+
+Azure’s Infrastructure-As-Code: ARM Templates
+
+ARM 
+
+
+An ARM template is a JSON file used to configure and deploy various Azure resources like VMs, AKS clusters, web apps, VNets, functions, and more to the Azure cloud. 
+The basic idea behind Infrastructure-as-Code (IAC) is to provide the infrastructure through automation rather than using manual processes. 
+In this Agile development world, even infrastructure code is changing and so it needs to be committed to version control repositories so it can be built/deployed using repeatable processes.
+
+
+Steps
+pool:
+  name: Hosted Ubuntu 1604
+Select an Azure subscription to validate Arm templates in a resource group.
+Validate an Azure Resource Manager (ARM) template for (Basic, Standard, and Premium) solutions to a resource group. You can also start, stop, delete, deallocate all Virtual Machines (VM) in a resource group.
+Build pipeline references secret variable names such as resource group name, passwords, tenant ID, etc.
+
+
+Pass template parameters in Override template parameters.
+Deployment mode should be "Validation" for validating ARM templates.
+Validate mode enables you to find problems with the template before creating actual resources
+
+
+variables:
+  rgname: 'arm-resource-group’
+steps:
+- task: AzureResourceGroupDeployment@2
+  displayName: 'standerd-template-validation'
+  inputs:
+    azureSubscription: 'subscription name(subscriptionid)'
+    resourceGroupName: '$(rgname)'
+    location: 'East US'
+    csmFile: 'main-template.json'
+    csmParametersFile: 'main-template.parameters.json'
+    overrideParameters: '-solutionType "Project-Edison" -deploymenttype Standard -geo-paired-region "EastUS2" -signalRlocation eastus2 -acrDeploymentLocation "CanadaCentral" -omsWorkspaceRegion "southeastasia" -appInsightsLocation "eastus" -appInsightsLocationDr "southcentralus" -tenantId $(tid) -botAdClientId "XXXXXXXXXX" -adObjectId "XXXX-XXXX-XXX-XXX-XXXX" -adClientSecret "$(adsp)" -azureAccountName "abc@gmail.com" -azurePassword "abcacacc123@" -adminName "adminuser" -sessionId "3791180c-24c5-4290-8459-a454feee90ab" -vmUsername "adminuser" -vmPassword "Pass@1212" -aksServicePrincipalClientId "XXX-XXXXa63c-XXXX" -aksServicePrincipalClientSecret $(ksp) -signalrCapacity 1 -dockerVM Yes -githuburl "$giturl" -azureAdPreviewModuleUri "https://github.com/raw/dev/code/Azu.zip" -cosmosdbModuleUri "https://github.com/raw/dev/code.zip" -siteName "test"'
+    deploymentMode: Validation
+  condition: always()
+  
+  After validating the ARM templates, delete the resource group by using the following Azure CLI task.
+
+steps:
+- task: AzureCLI@1
+  displayName: 'Deleting-validation-RG'
+  inputs:
+    azureSubscription: 'Subscription name (subscriptionid)'
+    scriptLocation: inlineScript
+    inlineScript: 'az group delete -n $(rgname) --yes'
+    
+    Use this task built-in pipeline to publish the build artifacts to Azure pipelines stored in the Azure DevOps server.
+
+steps:
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: ARM_templates'
+  inputs:
+    PathtoPublish: /home/arm
+    ArtifactName: 'ARM_templates'
+  
+  After everything is done, save and queue the build, and get the logs for success or failure of the build.
+
+Each task will generate a build log for the corresponding job.
+
+Deploy an ARM Template to a Resource Group (CD)
+
+e show deployment of three different solutions such as basic/standard/premium being deployed to the Azure cloud. First, a description of the solutions will be given, then the actual deployment pipeline will be discussed.
+
+The Basic solution will have all core components in an ARM template. Basic pricing tier efficiently works for development/test.
+
+The Standard solution has all the basic solution features plus has monitoring and HA (High Availability) features (Availability set, Availability zones, paired zones) to make application redundant at every level of failure, from an individual VM to the entire region.
+
+The Premium Solution has all the standard solution features plus automated disaster recovery in another region. Each Azure region is paired with another region within the same geography, together making a regional pair. To protect an application against a regional outage, deploy the application across multiple regions, using traffic manager to distribute internet traffic to the different regions.
+
+
+Deployment Pipeline (CD)
+Add Artifacts from source (Build) to deploy a release pipeline through multiple stages. Choose source type build as the one created above for validation.
+
+Various stages can be added using the graphics tools in Azure DevOps. Note the parallel nature of these pipelines for each SKU.
+
+ARM Template deployment (Basic, Standard, Premium):
+
+Select an Azure subscription to deploy Arm templates (Basic, Standard, Premium) in a resource group.
+
+Deployment mode should be Incremental for deploy ARM templates to a Resource group.
+
+Incremental mode handles deployments as incremental updates to the resource group. It leaves unchanged resources that exist in the resource group but is not specified in the template.
+
+
+variables:
+  basic_rg: 's_basic1'
+  location: 'westus'
+steps:
+- task: AzureResourceGroupDeployment@2
+  displayName: 'Basic Solution   Deployment'
+  inputs:
+    azureSubscription: 'CICD (subscription id)'
+    resourceGroupName: '$(basic_rg)'
+    location: '$(location)'
+    csmFile: '$(System.DefaultWorkingDirectory)/_SnS_Build_CI/ARM_drop/maintemplate.json'
+    overrideParameters: '-solutionType Basic-Solution -deploymentPrefix tere -cognitiveServicesLocation "eastus" -omsLocation "eastus" -appInsightsLocation "westus2" -locationDr westcentralus -trafficManagerName "NA" -b2cApplicationId XXXX-XXXX-XXX -b2cApplicationIdDR "NA" -b2cPolicy B2C_1_SignUp-In -b2cTenant onmicrosoft.com -b2cScope https://onmicrosoft.com/ -b2cScopeDR "NA" -videoIndexerKey "XXXX-XXXX-XXXX" -keyVaultName "NA" -keyVaultwebAppSecretName "NA" -keyVaultResourceGroup "NA" -webAppCertificatethumbPrint "NA"'
+    deploymentOutputs: 'output_variables'
+    
+    The standard solution will have two regions
+
+Primary Region(Deployment)
+Secondary Region (Re-Deployment)
+
+
+After everything is done, save and queue the release, and get the logs for success or failure of the release.
+
+Each task will generate a deployment log for the corresponding job.
+
+
+
+
+
+Sample ARM template to deploye Azure Infra.
+
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "adminUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "Username for the Virtual Machine."
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "minLength": 12,
+      "metadata": {
+        "description": "Password for the Virtual Machine."
+      }
+    },
+    "dnsLabelPrefix": {
+      "type": "string",
+      "defaultValue": "[toLower(concat(parameters('vmName'),'-', uniqueString(resourceGroup().id, parameters('vmName'))))]",
+      "metadata": {
+        "description": "Unique DNS Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "publicIpName": {
+      "type": "string",
+      "defaultValue": "myPublicIP",
+      "metadata": {
+        "description": "Name for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "publicIPAllocationMethod": {
+      "type": "string",
+      "defaultValue": "Dynamic",
+      "allowedValues": [
+        "Dynamic",
+        "Static"
+      ],
+      "metadata": {
+        "description": "Allocation method for the Public IP used to access the Virtual Machine."
+      }
+    },
+    "publicIpSku": {
+      "type": "string",
+      "defaultValue": "Basic",
+      "allowedValues": [
+        "Basic",
+        "Standard"
+      ],
+      "metadata": {
+        "description": "SKU for the Public IP used to access the Virtual Machine."
+      }
+    },
+
+    "OSVersion": {
+      "type": "string",
+      "defaultValue": "2019-Datacenter",
+      "allowedValues": [
+        "2008-R2-SP1",
+        "2012-Datacenter",
+        "2012-R2-Datacenter",
+        "2016-Nano-Server",
+        "2016-Datacenter-with-Containers",
+        "2016-Datacenter",
+        "2019-Datacenter",
+        "2019-Datacenter-Core",
+        "2019-Datacenter-Core-smalldisk",
+        "2019-Datacenter-Core-with-Containers",
+        "2019-Datacenter-Core-with-Containers-smalldisk",
+        "2019-Datacenter-smalldisk",
+        "2019-Datacenter-with-Containers",
+        "2019-Datacenter-with-Containers-smalldisk"
+      ],
+      "metadata": {
+        "description": "The Windows version for the VM. This will pick a fully patched image of this given Windows version."
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "defaultValue": "Standard_D2_v3",
+      "metadata": {
+        "description": "Size of the virtual machine."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Location for all resources."
+      }
+    },
+    "vmName": {
+      "type": "string",
+      "defaultValue": "simple-vm",
+      "metadata": {
+        "description": "Name of the virtual machine."
+      }
+    }
+  },
+  "variables": {
+    "storageAccountName": "[concat('bootdiags', uniquestring(resourceGroup().id))]",
+    "nicName": "myVMNic",
+    "addressPrefix": "10.0.0.0/16",
+    "subnetName": "Subnet",
+    "subnetPrefix": "10.0.0.0/24",
+    "virtualNetworkName": "MyVNET",
+    "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
+    "networkSecurityGroupName": "default-NSG"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2019-06-01",
+      "name": "[variables('storageAccountName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "Storage",
+      "properties": {}
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2020-06-01",
+      "name": "[parameters('publicIPName')]",
+      "location": "[parameters('location')]",
+      "sku": {
+        "name": "[parameters('publicIpSku')]"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "[parameters('publicIPAllocationMethod')]",
+        "dnsSettings": {
+          "domainNameLabel": "[parameters('dnsLabelPrefix')]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2020-06-01",
+      "name": "[variables('networkSecurityGroupName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "default-allow-3389",
+            "properties": {
+              "priority": 1000,
+              "access": "Allow",
+              "direction": "Inbound",
+              "destinationPortRange": "3389",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "sourceAddressPrefix": "*",
+              "destinationAddressPrefix": "*"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2020-06-01",
+      "name": "[variables('virtualNetworkName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+      ],
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[variables('addressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('subnetName')]",
+            "properties": {
+              "addressPrefix": "[variables('subnetPrefix')]",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/networkInterfaces",
+      "apiVersion": "2020-06-01",
+      "name": "[variables('nicName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', variables('virtualNetworkName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPName'))]"
+              },
+              "subnet": {
+                "id": "[variables('subnetRef')]"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Compute/virtualMachines",
+      "apiVersion": "2020-06-01",
+      "name": "[parameters('vmName')]",
+      "location": "[parameters('location')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))]",
+        "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[parameters('vmName')]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "MicrosoftWindowsServer",
+            "offer": "WindowsServer",
+            "sku": "[parameters('OSVersion')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "createOption": "FromImage",
+            "managedDisk": {
+              "storageAccountType": "StandardSSD_LRS"
+            }
+          },
+          "dataDisks": [
+            {
+              "diskSizeGB": 1023,
+              "lun": 0,
+              "createOption": "Empty"
+            }
+          ]
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('storageAccountName'))).primaryEndpoints.blob]"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "hostname": {
+      "type": "string",
+      "value": "[reference(parameters('publicIPName')).dnsSettings.fqdn]"
+    }
+  }
+}
