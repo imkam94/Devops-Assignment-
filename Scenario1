@@ -53,5 +53,6 @@ Solutions.
 42.Repeat the process for changing the codebase 
 43.This time, update the version number from “1.0” to “2.0”. This will invoke the release pipeline.
 44.Eventually there will be an issue with the QA deployment. While it deployed out successfully, one of the quality gates failed. This will need to be resolved for that stage to be approved. Click the View post-deployment gates button
-
+(For a pre-deployment approval, choose the icon at the entry point of the stage and enable pre-deployment approvers.
+For a post-deployment approval, choose the icon at the exit point of the stage and enable post-deployment approvers.) for automated cicd pipeline 
 
