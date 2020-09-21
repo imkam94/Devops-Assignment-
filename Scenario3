@@ -1,1 +1,241 @@
+A Toy Retail company ToyTrex has it retail application deployed as 3-tier application - Web App(UI), Web
+API(middle layer) and Database as Azure SQL.
+The user load started increasing multiple fold every month and complex programs getting implemented,
+the application started performing poorly.
+As a result, company decided to re-architect the middle layer as microservices using Azure Kubernetes
+Services.
+The new architecture has below design decisions.
+1) The middle layer should be implemented as Microservices using Azure AKS
+2) The middle layer API should be deployed as containerized application images
+3) The container images will use Azure Container Repository (ACR) as the private image repository
+4) The CI/CD pipelines for microservices should be implemented using Azure DevOps services.
+5) The Azure DevOps should be able to access ACR and download the container images for microservices
+deployment
+6) The image should be deployed as templates such as &lt;image_name&gt;:&lt;build_id&gt;
+Explain the DevOps configuration and steps in detail for above requirements
 
+Solutions
+
+I will use Azure Kubernetese Serices Azure Container repository.
+Azure Subscription 
+AKS Managed cluster.
+
+Create an Azure Container Registry (ACR)
+
+The Azure container registry is a private Docker registry in Azure that stores Docker container images and uses Docker commands to push a container image into a registry. In the end, it pulls and runs the image from the registry. In order to use this tool, you need to: 
+
+Install Azure command-line interface.
+
+Check the version of azure-CLI version with the following command.
+
+
+az --version
+
+command to set the subscription id or name of the subscription.
+
+az account set --subscription "$(id or name)"
+
+Create a resource group.
+
+az group create --name $(resource group) --location easttus
+
+Create a container registry by using the following command:
+
+az acr create --resource-group (myResourceGroup) --name myContainerRegistry --sku Basic
+
+Before pulling and pushing images into the ACR, you need to log in to ACR by using the following command.
+
+az acr login --name <acrName>
+
+Continuous Integration (CI)
+
+Use the azure-pipelines.yml as root of your repository and use variables.
+This .yaml file will create a build pipeline for your project. Modify this file and commit it back to your repository so that your build/deploy processes are also treated as code.
+
+Steps
+Azure pipelines have an option to build and deploy using Microsoft-hosted agents. Each time you build or release a pipeline, you get a fresh virtual machine (VM) for the build.
+If Microsoft-hosted agents don't work, use a self-hosted agent that will act as a system host.
+pool:
+   name: Hosted Ubuntu 1604
+
+Build, push, or run a container Docker application. The task can be used with Docker or Azure Container registry.
+
+Build Container Image Using docker-compose.yaml
+This task will build the Docker image from the docker-compose file mentioned the ACR  and subscription details
+
+steps:
+- task: DockerCompose@0
+  displayName: 'Build services'
+  inputs:
+    azureSubscription: '(your subscritpionid)'
+    azureContainerRegistry: '{"loginServer":"iotci.azurecr.io", "id" : "/subscriptions/a476/resourceGroups/123aa/providers/Microsoft.ContainerRegistry/registries/X123"}'
+    dockerComposeFile: 'docker-compose.yml'
+    action: 'Build services'
+    additionalImageTags: '$(Build.BuildId)'
+    includeLatestTag: true
+    
+Push a container image to Azure container registry(ACR)
+
+steps:
+- task: DockerCompose@0
+  displayName: 'Push services'
+  inputs:
+    azureSubscription: 'SIOT-CI-01 (your subscriptinid)'
+    azureContainerRegistry: '{"loginServer":"iotci.azurecr.io", "id" : "/subscriptions/123456/resourceGroups/iotcicd/providers/Microsoft.ContainerRegistry/registries/iotcicd9fa3"}'
+    dockerComposeFile: 'docker-compose.yml'
+    action: 'Push services'
+    additionalImageTags: '$(Build.BuildId)'
+ 
+Use of this task in the build pipeline to publish the build artifacts to the Azure pipelines file share.  Artifacts of the build store it in the Azure DevOps server.
+
+steps:
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: drop'
+
+
+
+Release Pipeline (CD)
+Before creating a release pipeline, you need to create an AKS (Azure Kubernetes Cluster) manually by using Azure CLI or Azure Portal. AKS is a managed Kubernetes cluster used to quickly deploy and manage the cluster.
+
+
+Create a Kubernetes Cluster
+
+Use the following command to create an AKS cluster with one node.
+
+az aks create \
+    --resource-group myResourceGroup \
+    --name myAKSCluster \
+    --node-count 1 \
+    --enable-addons monitoring \
+    --generate-ssh-keys
+    
+Manage kubernetes cluster with the kubectl command line; this will communicate with the kubernetes API cluster.
+Use the following command to download credentials and configure the Kubernetes CLI.
+
+
+az aks get-credentials --resource-group myResourceGroup --name myAKSCluster
+
+Verify the connection to the cluster; use the kubectl get command to list the nodes
+
+
+kubectl get nodes
+
+Make sure that status is Ready
+
+Run the Application
+Kubernetes describes a desired state of the cluster and what container images to run. A manifest is used to create all objects needed; it can create a deployment, service, ingress, config map. Create a namespace with the following command.
+
+
+kubectl create ns <namespace-name>
+
+Create a file name with azure-svc.yaml, azure-dep.yaml and load balancer for service to expose the outside world. The Yaml definition will use these manifest files to deploy objects into a cluster.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-ToyTrex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-ToyTrex
+  template:
+    metadata:
+      labels:
+        app: azure-ToyTrex
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: azure-ToyTrex
+        image: dockerimage
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - containerPort: 6379
+          name: azure-ToyTrex
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-ToyTrex
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: azure-ToyTrex
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: azure-ToyTrex
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azure-ToyTrex
+  template:
+    metadata:
+      labels:
+        app: azure-ToyTrex
+    spec:
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
+      containers:
+      - name: azure-ToyTrex
+        image: microsoft/azure-ToyTrexdockerimage
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        ports:
+        - containerPort: 80
+        env:
+        - name: REDIS
+          value: "azure-ToyTrex"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: azure-ToyTrex
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+  selector:
+    app: azure-ToyTrex
+    
+    
+Deploy the application in AKS by using Kubectl to apply the following task.
+
+variables:
+  cluster_rg: 'ResourceGroup-EUS'
+  kube_cluster: 'azure-ToyTrex cluster'
+steps:
+- task: Kubernetes@1
+  displayName: 'kubectl apply'
+  inputs:
+    connectionType: 'Azure Resource Manager'
+    azureSubscriptionEndpoint: 
+    azureResourceGroup: '$(cluster_rg)'
+    kubernetesCluster: '$(kube_cluster)'
+    command: apply
+    useConfigurationFile: true
+    configuration: 'c:/azure.yaml'
+    secretType: generic
+    secretName: 'acr-authentication'
+    versionSpec: 1.8.1
+    
+    Verify each task logs for Build (CI) and Release pipeline(CD) . 
+    
+    
+    
+ 
