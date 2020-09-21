@@ -31,5 +31,27 @@ Solutions.
 20.Save the release pipeline.
 21.Invoking a continuous delivery release to QA
 22.go to azure portal tab to open your Azure DevOps project.
-23.
+23.Click Edit to edit the code file
+24.Commit the changes back to the repo. This will kick off a build based on the preconfigured build pipeline.
+25.Navigate to the Pipelines hub.
+26.Open the most recent build  It may be queued, in progress, or already completed.
+27.Follow the build until completion.
+28.Click the Releases tab to see the new release get going.
+29.Click the release. As with the build, it may be queued, in progress, or already completed when you get here.
+30.Follow the release until it succeeds.
+31.Return to the Azure DevOps browser tab.
+32.The new stage is added after the current one, which is what we want. However, before we can consider the QA deployment successful, we’ll need to define a post-deployment condition. Click the Post-deployment conditions button on the QA stage.
+33.Enable the Gates option
+34.There are several kinds of gates available that can automatically test virtually anything you need to make sure a deployment is in good shape. These could be the return values of Azure functions or REST APIs, queries to Azure for alerts, or work item queries in Azure DevOps. You can also configure how long the platform should delay before evaluating the gates for the first time. In this case, change that to 0 so it will test them immediately after deployment. Then click Add | Query Work Items
+35.Select the Query for Shared Queries | Critical Bugs. We will make it our policy that the QA deployment cannot be considered a success until all critical bugs have been resolved.
+36.Expand Evaluation options and update the Time between re-evaluation of gates to 5. If this gate fails, we want it to reevaluate the query every 5 minutes until it clears because engineers will need some time to confirm those critical bugs are fixed in the current version. However, if those bugs aren’t cleared and the release isn’t manually failed, this configuration will automatically fail the gate after 1 day.
+37 We have now turn our focus to the production stage. Select the Copy of QA stage
+38.Click its Pre-deployment conditions button.
+39.Enable the Pre-deployment approvals and add yourself as an Approver(he idea here is that you won’t be asked to approve the production deployment until after the QA deployment has succeeded. At that point, someone on this list will need to approve the deployment to production. Also clear the box for User requesting a release of deployment should not approve if it’s checked. For the purposes of this lab, you can approve releases you have requested.)
+40.Click the Prod stage’s 1 job, 1 task.
+41.Save the release pipeline.
+42.Repeat the process for changing the codebase 
+43.This time, update the version number from “1.0” to “2.0”. This will invoke the release pipeline.
+44.Eventually there will be an issue with the QA deployment. While it deployed out successfully, one of the quality gates failed. This will need to be resolved for that stage to be approved. Click the View post-deployment gates button
+
 
